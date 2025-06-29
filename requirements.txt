@@ -1,0 +1,17 @@
+numpy
+opencv-python
+pyaudio
+insightface
+onnxruntime
+torch
+torchaudio
+soundfile
+speechbrain
+fer
+moviepy==1.0.3
+pillow
+loguru
+pycryptodome
+pytest
+scikit-learn
+mediapipe

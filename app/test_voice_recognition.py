@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""语音识别测试工具"""
+
+import pyaudio
+import numpy as np
+import wave
+import time
+from loguru import logger
+from core.perception.voice_recognizer import VoiceRecognizer
+from config.voice_config import VOICE_CONFIG
+
+def test_voice_recognition():
+    """测试语音识别"""
+    logger.info("开始测试语音识别...")
+    
+    # 音频配置
+    config = {
+        "format": pyaudio.paInt16,
+        "channels": 1,
+        "rate": 16000,
+        "chunk": 1024
+    }
+    
+    # 初始化语音识别器
+    voice_recognizer = VoiceRecognizer(VOICE_CONFIG)
+    
+    audio = pyaudio.PyAudio()
+    
+    try:
+        # 打开音频流
+        stream = audio.open(
+            format=config["format"],
+            channels=config["channels"],
+            rate=config["rate"],
+            input=True,
+            frames_per_buffer=config["chunk"]
+        )
+        
+        logger.info("开始录音，请说话（5秒）...")
+        frames = []
+        
+        for i in range(0, int(config["rate"] / config["chunk"] * 5)):
+            data = stream.read(config["chunk"])
+            frames.append(data)
+            
+            # 计算音量
+            audio_data = np.frombuffer(data, dtype=np.int16)
+            volume = np.abs(audio_data).mean()
+            
+            if i % 10 == 0:  # 每秒显示一次
+                logger.info(f"录音中... 音量: {volume:.2f}")
+        
+        logger.info("录音完成，开始识别...")
+        
+        # 合并音频数据
+        audio_bytes = b''.join(frames)
+        
+        # 保存音频文件
+        with wave.open("test_voice.wav", "wb") as wf:
+            wf.setnchannels(config["channels"])
+            wf.setsampwidth(audio.get_sample_size(config["format"]))
+            wf.setframerate(config["rate"])
+            wf.writeframes(audio_bytes)
+        
+        logger.info("音频已保存到 test_voice.wav")
+        
+        # 计算音频统计
+        all_data = np.frombuffer(audio_bytes, dtype=np.int16)
+        avg_volume = np.abs(all_data).mean()
+        max_volume = np.abs(all_data).max()
+        duration = len(all_data) / config["rate"]
+        
+        logger.info(f"音频统计: 时长={duration:.2f}秒, 平均音量={avg_volume:.2f}, 最大音量={max_volume:.2f}")
+        
+        # 进行语音识别
+        if avg_volume > 5:
+            logger.info("开始语音识别...")
+            result = voice_recognizer.recognize(audio_bytes)
+            if result:
+                logger.info(f"识别结果: {result}")
+            else:
+                logger.warning("未识别到内容")
+        else:
+            logger.warning("音量过低，跳过识别")
+        
+        stream.stop_stream()
+        stream.close()
+        
+    except Exception as e:
+        logger.error(f"测试失败: {e}")
+    finally:
+        audio.terminate()
+
+if __name__ == "__main__":
+    test_voice_recognition() 
